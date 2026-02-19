@@ -17,6 +17,12 @@ class RemoteInputHandler {
     private weak var menuBarManager: MenuBarManager?
     private var devices: [IOHIDDevice] = []
     
+    /// Called on any button activity; use to trigger trackpad re-scan after remote wake.
+    var onButtonActivity: (() -> Void)?
+    
+    // First press after connection: do not perform action (sound already played at connect).
+    private var isFirstPressAfterConnection = false
+    
     // Click/drag state
     private var isSelectPressed = false
     private var selectPressTime: UInt64 = 0
@@ -41,6 +47,7 @@ class RemoteInputHandler {
                 IOHIDDeviceClose(d, IOOptionBits(kIOHIDOptionsTypeNone))
             }
             devices.removeAll()
+            isFirstPressAfterConnection = false
             return
         }
         
@@ -53,12 +60,16 @@ class RemoteInputHandler {
             IOHIDDeviceRegisterInputValueCallback(device, inputValueCallback, Unmanaged.passUnretained(self).toOpaque())
             IOHIDDeviceScheduleWithRunLoop(device, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
             devices.append(device)
+            isFirstPressAfterConnection = true
+            CursorController.playKeyPressFeedback()
         } else {
             // Fallback: open without seize
             if IOHIDDeviceOpen(device, IOOptionBits(kIOHIDOptionsTypeNone)) == kIOReturnSuccess {
                 IOHIDDeviceRegisterInputValueCallback(device, inputValueCallback, Unmanaged.passUnretained(self).toOpaque())
                 IOHIDDeviceScheduleWithRunLoop(device, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
                 devices.append(device)
+                isFirstPressAfterConnection = true
+                CursorController.playKeyPressFeedback()
             }
         }
     }
@@ -70,6 +81,15 @@ class RemoteInputHandler {
         let intValue = IOHIDValueGetIntegerValue(value)
         
         guard let buttonName = identifyButton(page: usagePage, usage: usage) else { return }
+        
+        // Any button activity may cause the remote to re-enumerate; re-scan MT so trackpad can reconnect.
+        onButtonActivity?()
+        
+        // First key-down after connection: do not perform action (sound already played at connect).
+        if intValue == 1 && isFirstPressAfterConnection {
+            isFirstPressAfterConnection = false
+            return
+        }
         
         // Handle select button (trackpad click) - distinguish click vs drag
         if buttonName == "select" {
@@ -87,6 +107,9 @@ class RemoteInputHandler {
         
         let action = menuBarManager?.getMapping(for: buttonName) ?? .none
         print("🔘 Button pressed: \(buttonName) → \(action.rawValue)")
+        if action != .none {
+            CursorController.playKeyPressFeedback()
+        }
         executeAction(action)
     }
     
@@ -114,6 +137,7 @@ class RemoteInputHandler {
                 cursorController.mouseUp()
             } else {
                 print("🔘 Select button: Click")
+                CursorController.playKeyPressFeedback()
                 cursorController.performClick()
             }
             isDragging = false
@@ -172,7 +196,10 @@ class RemoteInputHandler {
         case .none:
             break
         case .playPause:
-            mediaController.sendMediaKey(.playPause)
+            // In .app the remote also sends Play/Pause over AVRCP; skip our send so only AVRCP fires (once).
+            if !Bundle.main.bundlePath.hasSuffix(".app") {
+                mediaController.sendMediaKey(.playPause)
+            }
         case .nextTrack:
             mediaController.sendMediaKey(.next)
         case .previousTrack:
@@ -193,9 +220,13 @@ class RemoteInputHandler {
             sendKey(kVK_Space)
         case .enter:
             sendKey(kVK_Return)
-        case .toggleTrackpadMode:
-            menuBarManager?.toggleTrackpadMode()
+        case .missionControl:
+            sendMissionControlKey()
         }
+    }
+    
+    private func sendMissionControlKey() {
+        openMissionControl()
     }
     
     private func sendKey(_ keyCode: Int) {
@@ -204,6 +235,21 @@ class RemoteInputHandler {
         usleep(10000)
         CGEvent(keyboardEventSource: src, virtualKey: CGKeyCode(keyCode), keyDown: false)?.post(tap: .cghidEventTap)
     }
+}
+
+/// Opens Mission Control (one path for CLI and app).
+func openMissionControl() {
+    let bundleID = "com.apple.exposelauncher"
+    if Bundle.main.bundlePath.hasSuffix(".app"),
+       let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+        let config = NSWorkspace.OpenConfiguration()
+        NSWorkspace.shared.openApplication(at: url, configuration: config) { _, _ in }
+        return
+    }
+    let proc = Process()
+    proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+    proc.arguments = ["-b", bundleID]
+    try? proc.run()
 }
 
 // C callback

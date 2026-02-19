@@ -7,6 +7,7 @@
 
 import AppKit
 import ApplicationServices
+import CoreGraphics
 import Darwin
 
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -41,12 +42,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize controllers
         let cursorController = CursorController()
         let mediaController = MediaController()
+        menuBarManager.mediaController = mediaController
         
         remoteInputHandler = RemoteInputHandler(
             cursorController: cursorController,
             mediaController: mediaController,
             menuBarManager: menuBarManager
         )
+        
+        // Start touch handler for trackpad (before remote detection so we can wire the callback)
+        touchHandler = TouchHandler(cursorController: cursorController)
+        touchHandler?.scrollScale = menuBarManager.scrollSpeed.scale
+        touchHandler?.start()
+        remoteInputHandler?.onButtonActivity = { [weak self] in
+            self?.touchHandler?.tryReconnectTrackpad()
+        }
         
         // Start remote detection
         remoteDetector = RemoteDetector { [weak self] device in
@@ -57,6 +67,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         remoteDetector?.startDetection()
         
+        // Request Input Monitoring so media key tap works in both CLI and .app
+        if #available(macOS 10.15, *) {
+            if !CGPreflightListenEventAccess() {
+                CGRequestListenEventAccess()
+            }
+        }
+        
         // Start media key interceptor
         mediaKeyInterceptor = MediaKeyInterceptor()
         mediaKeyInterceptor?.onMediaKey = { [weak self] keyType in
@@ -65,19 +82,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         mediaKeyInterceptor?.start()
         
-        // Start touch handler for trackpad
-        touchHandler = TouchHandler(cursorController: cursorController)
-        touchHandler?.trackpadMode = menuBarManager.trackpadMode
-        touchHandler?.scrollScale = menuBarManager.scrollSpeed.scale
-        touchHandler?.start()
-        
         // Wire up settings changes
-        menuBarManager.onTrackpadModeChanged = { [weak self] mode in
-            self?.touchHandler?.trackpadMode = mode
-        }
-        menuBarManager.onScrollSpeedChanged = { [weak self] speed in
-            self?.touchHandler?.scrollScale = speed.scale
-        }
     }
     
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -100,6 +105,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     // MARK: - Media Key Handling
+
+    /// Convert mach_absolute_time() delta to seconds (machine ticks vary; use timebase).
+    private static let machTimebase: (numer: UInt32, denom: UInt32) = {
+        var info = mach_timebase_info_data_t(numer: 0, denom: 0)
+        guard mach_timebase_info(&info) == 0 else { return (1, 1) }
+        return (info.numer, info.denom)
+    }()
+
+    private static func machDeltaToSeconds(from start: UInt64) -> Double {
+        guard start > 0 else { return .infinity }
+        let now = mach_absolute_time()
+        let delta = now >= start ? (now - start) : 0
+        let nanos = delta * UInt64(Self.machTimebase.numer) / UInt64(Self.machTimebase.denom)
+        return Double(nanos) / 1_000_000_000.0
+    }
     
     private func handleInterceptedMediaKey(_ keyType: MediaKeyInterceptor.MediaKeyType) -> Bool {
         let buttonName: String
@@ -126,9 +146,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Check if RemoteInputHandler just processed this button (prevent double-processing)
-        let currentTime = mach_absolute_time()
         if RemoteInputHandler.lastProcessedButton == buttonName {
-            let timeSinceLastProcess = Double(currentTime - RemoteInputHandler.lastProcessedTime) / 1_000_000_000.0
+            let timeSinceLastProcess = Self.machDeltaToSeconds(from: RemoteInputHandler.lastProcessedTime)
             if timeSinceLastProcess < 0.2 { // Within 200ms debounce window
                 // RemoteInputHandler already handled this, consume the event but don't process again
                 return true
@@ -142,7 +161,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         if action.rawValue == defaultAction {
-            return false // Let system handle default
+            // In .app, Play/Pause is also sent over AVRCP; we don't send from HID there. Let system handle once.
+            if keyType == .playPause && Bundle.main.bundlePath.hasSuffix(".app") {
+                return false // Let system handle (AVRCP); we don't send from HID in .app
+            }
+            return true // Consume; HID path is the single source (CLI or non–play/pause)
         }
         
         menuBarManager.executeAction(action.rawValue)

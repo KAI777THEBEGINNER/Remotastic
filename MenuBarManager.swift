@@ -22,13 +22,7 @@ enum ButtonAction: String, CaseIterable {
     case escape = "Escape"
     case space = "Space"
     case enter = "Enter"
-    case toggleTrackpadMode = "Toggle Trackpad Mode"
-}
-
-// Trackpad behavior modes
-enum TrackpadMode: String {
-    case cursor = "Cursor"
-    case scroll = "Scroll"
+    case missionControl = "Mission Control"
 }
 
 // Scroll speed options
@@ -55,20 +49,14 @@ class MenuBarManager {
     // Button mappings (stored in UserDefaults)
     private var buttonMappings: [String: ButtonAction] = [:]
     
-    // Trackpad mode (cursor or scroll)
-    private(set) var trackpadMode: TrackpadMode = .cursor
-    
-    // Scroll speed
-    private(set) var scrollSpeed: ScrollSpeed = .slow
+    // Scroll speed (used for trackpad scroll scale; no menu, native multitouch)
+    private(set) var scrollSpeed: ScrollSpeed = .medium
     
     // Callback for when mappings change
     var onMappingsChanged: (([String: ButtonAction]) -> Void)?
     
-    // Callback for trackpad mode change
-    var onTrackpadModeChanged: ((TrackpadMode) -> Void)?
-    
-    // Callback for scroll speed change
-    var onScrollSpeedChanged: ((ScrollSpeed) -> Void)?
+    /// Set by app delegate so menu bar can delegate media actions to MediaController (one path for CLI and app).
+    var mediaController: MediaController?
     
     init(statusItem: NSStatusItem) {
         self.statusItem = statusItem
@@ -76,48 +64,14 @@ class MenuBarManager {
         self.statusMenuItem = NSMenuItem(title: "Status: Disconnected", action: nil, keyEquivalent: "")
         
         loadMappings()
-        loadTrackpadMode()
-        loadScrollSpeed()
         setupMenuBar()
-    }
-    
-    private func loadTrackpadMode() {
-        if let saved = UserDefaults.standard.string(forKey: "trackpadMode"),
-           let mode = TrackpadMode(rawValue: saved) {
-            trackpadMode = mode
-        }
-    }
-    
-    private func loadScrollSpeed() {
-        if let saved = UserDefaults.standard.string(forKey: "scrollSpeed"),
-           let speed = ScrollSpeed(rawValue: saved) {
-            scrollSpeed = speed
-        } else {
-            // First launch - use medium as default
-            scrollSpeed = .medium
-            UserDefaults.standard.set(scrollSpeed.rawValue, forKey: "scrollSpeed")
-        }
-    }
-    
-    func setScrollSpeed(_ speed: ScrollSpeed) {
-        scrollSpeed = speed
-        UserDefaults.standard.set(speed.rawValue, forKey: "scrollSpeed")
-        onScrollSpeedChanged?(speed)
-        rebuildMenu()
-    }
-    
-    func toggleTrackpadMode() {
-        trackpadMode = (trackpadMode == .cursor) ? .scroll : .cursor
-        UserDefaults.standard.set(trackpadMode.rawValue, forKey: "trackpadMode")
-        onTrackpadModeChanged?(trackpadMode)
-        rebuildMenu()
     }
     
     private func loadMappings() {
         // Default mappings (only used on first launch)
         let defaultMappings: [String: ButtonAction] = [
             "playPause": .playPause,
-            "menu": .toggleTrackpadMode,
+            "menu": .missionControl,
             "select": .click,
             "volumeUp": .volumeUp,
             "volumeDown": .volumeDown,
@@ -127,10 +81,12 @@ class MenuBarManager {
         
         // Load saved mappings from UserDefaults
         if let saved = UserDefaults.standard.dictionary(forKey: "buttonMappings") as? [String: String] {
-            // User has saved mappings - use those
+            // User has saved mappings - use those (migrate old "Toggle Trackpad Mode" to .escape)
             for (button, actionRaw) in saved {
                 if let action = ButtonAction(rawValue: actionRaw) {
                     buttonMappings[button] = action
+                } else if actionRaw == "Toggle Trackpad Mode" {
+                    buttonMappings[button] = .escape
                 }
             }
             // Fill in any missing buttons with defaults
@@ -138,6 +94,11 @@ class MenuBarManager {
                 if buttonMappings[button] == nil {
                     buttonMappings[button] = action
                 }
+            }
+            // One-time migration: Menu was default Escape; prefer Mission Control for Expose
+            if buttonMappings["menu"] == .escape {
+                buttonMappings["menu"] = .missionControl
+                saveMappings()
             }
         } else {
             // First launch - use defaults
@@ -236,29 +197,6 @@ class MenuBarManager {
         
         menu.addItem(NSMenuItem.separator())
         
-        // Trackpad Mode toggle
-        let modeLabel = trackpadMode == .cursor ? "Trackpad: Cursor Mode ↔" : "Trackpad: Scroll Mode ↕"
-        let trackpadModeItem = NSMenuItem(title: modeLabel, action: #selector(toggleTrackpadModeAction), keyEquivalent: "t")
-        trackpadModeItem.target = self
-        menu.addItem(trackpadModeItem)
-        
-        // Scroll Speed submenu
-        let scrollSpeedItem = NSMenuItem(title: "Scroll Speed: \(scrollSpeed.rawValue)", action: nil, keyEquivalent: "")
-        let scrollSpeedMenu = NSMenu()
-        for speed in ScrollSpeed.allCases {
-            let speedItem = NSMenuItem(title: speed.rawValue, action: #selector(changeScrollSpeed(_:)), keyEquivalent: "")
-            speedItem.target = self
-            speedItem.representedObject = speed
-            if speed == scrollSpeed {
-                speedItem.state = .on
-            }
-            scrollSpeedMenu.addItem(speedItem)
-        }
-        scrollSpeedItem.submenu = scrollSpeedMenu
-        menu.addItem(scrollSpeedItem)
-        
-        menu.addItem(NSMenuItem.separator())
-        
         // Quit
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
@@ -272,15 +210,6 @@ class MenuBarManager {
         buttonMappings[buttonKey] = action
         saveMappings()
         rebuildMenu()
-    }
-    
-    @objc private func toggleTrackpadModeAction() {
-        toggleTrackpadMode()
-    }
-    
-    @objc private func changeScrollSpeed(_ sender: NSMenuItem) {
-        guard let speed = sender.representedObject as? ScrollSpeed else { return }
-        setScrollSpeed(speed)
     }
     
     func updateConnectionStatus(connected: Bool) {
@@ -326,17 +255,17 @@ class MenuBarManager {
         case .none:
             break
         case .playPause:
-            sendMediaKey(NX_KEYTYPE_PLAY)
+            mediaController?.sendMediaKey(.playPause)
         case .nextTrack:
-            sendMediaKey(NX_KEYTYPE_NEXT)
+            mediaController?.sendMediaKey(.next)
         case .previousTrack:
-            sendMediaKey(NX_KEYTYPE_PREVIOUS)
+            mediaController?.sendMediaKey(.previous)
         case .volumeUp:
-            adjustVolume(up: true)
+            mediaController?.sendMediaKey(.volumeUp)
         case .volumeDown:
-            adjustVolume(up: false)
+            mediaController?.sendMediaKey(.volumeDown)
         case .mute:
-            sendMediaKey(NX_KEYTYPE_MUTE)
+            mediaController?.sendMediaKey(.mute)
         case .click:
             performClick()
         case .rightClick:
@@ -347,47 +276,13 @@ class MenuBarManager {
             sendKey(kVK_Space)
         case .enter:
             sendKey(kVK_Return)
-        case .toggleTrackpadMode:
-            toggleTrackpadMode()
+        case .missionControl:
+            sendMissionControlKey()
         }
     }
     
-    private func sendMediaKey(_ keyCode: Int32) {
-        let keyDownEvent = NSEvent.otherEvent(
-            with: .systemDefined,
-            location: .zero,
-            modifierFlags: NSEvent.ModifierFlags(rawValue: 0xa00),
-            timestamp: 0,
-            windowNumber: 0,
-            context: nil,
-            subtype: 8,
-            data1: Int((keyCode << 16) | (0xa << 8)),
-            data2: -1
-        )
-        let keyUpEvent = NSEvent.otherEvent(
-            with: .systemDefined,
-            location: .zero,
-            modifierFlags: NSEvent.ModifierFlags(rawValue: 0xa00),
-            timestamp: 0,
-            windowNumber: 0,
-            context: nil,
-            subtype: 8,
-            data1: Int((keyCode << 16) | (0xb << 8)),
-            data2: -1
-        )
-        keyDownEvent?.cgEvent?.post(tap: .cghidEventTap)
-        usleep(50000)
-        keyUpEvent?.cgEvent?.post(tap: .cghidEventTap)
-    }
-    
-    private func adjustVolume(up: Bool) {
-        // Use AppleScript for volume (simpler and more reliable)
-        let script = up ? "set volume output volume ((output volume of (get volume settings)) + 6.25)"
-                        : "set volume output volume ((output volume of (get volume settings)) - 6.25)"
-        if let appleScript = NSAppleScript(source: script) {
-            var error: NSDictionary?
-            appleScript.executeAndReturnError(&error)
-        }
+    private func sendMissionControlKey() {
+        openMissionControl()
     }
     
     private func performClick() {

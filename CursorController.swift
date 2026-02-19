@@ -6,6 +6,7 @@
 //
 
 import CoreGraphics
+import CoreFoundation
 import Foundation
 import AppKit
 
@@ -15,6 +16,16 @@ class CursorController {
     
     var isDragging: Bool = false
     var isClickActive: Bool = false
+    
+    /// System alert sound for key press and tap-to-click (one path for CLI and app).
+    static func playKeyPressFeedback() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { playKeyPressFeedback() }
+            return
+        }
+        // NSSound.beep() plays user's system alert sound (documented Cocoa API).
+        NSSound.beep()
+    }
     
     // MARK: - Helper Functions
     
@@ -38,7 +49,7 @@ class CursorController {
     func moveCursor(deltaX: CGFloat, deltaY: CGFloat) -> (clampedX: Bool, clampedY: Bool) {
         let scaledDeltaX = deltaX * sensitivity * (abs(deltaX) > 5 ? acceleration : 1.0)
         let scaledDeltaY = deltaY * sensitivity * (abs(deltaY) > 5 ? acceleration : 1.0)
-        
+
             // Get current cursor position - use CGEvent which gives us global Quartz coordinates
         // This works correctly across all displays
         let beforePosition: CGPoint
@@ -91,7 +102,7 @@ class CursorController {
             return (clampedX, clampedY)
         }
         event.post(tap: CGEventTapLocation.cghidEventTap)
-        
+
         return (clampedX, clampedY)
     }
     
