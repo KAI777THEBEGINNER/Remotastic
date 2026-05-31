@@ -6,50 +6,111 @@ Control your Mac with your Apple TV Siri Remote — a lightweight menu bar app t
 
 ## Features
 
-- **Trackpad Control**: Cursor movement, clicking, dragging, and two-finger scrolling
-- **Trackpad Modes**: Switch between Cursor Mode and Scroll Mode
-- **Customizable Buttons**: Remap any button to media controls, mouse actions, or keyboard shortcuts
-- **Multi-Monitor Support**: Works across all displays
-- **Menu Bar Integration**: Quick access to settings and connection status
+- **True Trackpad Experience**: Smooth cursor movement with the Siri Remote touch surface, including clicking, dragging, and two-finger scrolling
+- **Customizable Button Mappings**: Remap any remote button to media controls, mouse actions, or keyboard shortcuts
+- **Pause / Resume**: Instantly toggle all mappings on/off to avoid interfering with your Magic Trackpad during work
+- **Cursor & Scroll Speed**: Adjust trackpad sensitivity directly from the menu bar
+- **Multi-Monitor Support**: Cursor works across all displays
+- **Auto-Reconnect**: Automatically recovers after remote sleep or Bluetooth reconnection
+- **Menu Bar Integration**: Quick access to settings, connection status, and pause toggle
+
+## Supported Devices
+
+Tested with the following Apple TV Siri Remote models:
+
+| Vendor ID | Product ID | Model |
+|-----------|------------|-------|
+| 0x004C    | 0x0315     | Apple TV Remote (2021 / 3rd gen) |
+| 0x004C    | 0x030E     | Siri Remote (2nd gen) |
+| 0x004C    | 0x030D     | Siri Remote (2nd gen, alternate) |
+| 0x004C    | 0x0269     | Siri Remote (1st gen) |
+| 0x004C    | 0x0267     | Siri Remote (1st gen, alternate) |
+| 0x004C    | 0x0266     | Siri Remote (1st gen, alternate) |
+| 0x004C    | 0x0255     | Apple TV Remote (early model) |
+| 0x004C    | 0x0221     | Apple TV Remote (early model) |
+
+Other models may work if they expose compatible HID interfaces.
 
 ## Installation
 
-**Prerequisites**: macOS 11.0+, Xcode Command Line Tools, Apple TV Siri Remote (tested with model A1513)
+**Prerequisites**: macOS 11.0+, Xcode Command Line Tools, an Apple TV Siri Remote paired via Bluetooth.
 
 ```bash
-git clone https://github.com/laurentschuermans/Remotastic.git
+git clone https://github.com/KAI777THEBEGINNER/Remotastic.git
 cd Remotastic
 ./build.sh
 ./create_app_bundle.sh
-open Remotastic.app
+cp -R Remotastic.app /Applications/
 ```
 
-**Permissions**: Grant Accessibility permissions in System Settings → Privacy & Security → Accessibility
+Then double-click **Remotastic** in your Applications folder.
 
-**Pair Remote**: Hold Menu + Volume Up for 5 seconds, then pair in System Settings → Bluetooth
+## Required Permissions
+
+Remotastic requires two system permissions to function:
+
+1. **Accessibility** (System Settings → Privacy & Security → Accessibility)
+   - Required for: cursor movement, mouse clicks, and simulated keyboard shortcuts
+2. **Input Monitoring** (System Settings → Privacy & Security → Input Monitoring)
+   - Required for: intercepting system media keys to prevent duplicate actions
+
+The app will prompt you automatically when a permission is needed.
+
+## Pairing Your Remote
+
+1. On your Siri Remote, press and hold **Menu + Volume Up** for 5 seconds
+2. On your Mac, go to **System Settings → Bluetooth**
+3. Select your remote from the list and click **Connect**
+4. Open Remotastic — it will appear in the menu bar automatically
 
 ## Usage
 
-Click the menu bar icon to:
-- View connection status
-- Configure button mappings
-- Toggle trackpad mode (Cursor ↔ Scroll)
-- Adjust scroll speed
+Click the **Remotastic** menu bar icon to:
 
-**Default Mappings**: Play/Pause → Media, Menu → Toggle Mode, Select → Click, Volume → Volume, TV → Right Click, Siri → Space
+- View Bluetooth connection status
+- Configure button mappings per app
+- Toggle **Pause / Resume** to temporarily disable all remote inputs
+- Adjust **Cursor Speed** and **Scroll Speed**
+
+### Default Button Mappings
+
+| Remote Button | Default Action | Description |
+|---------------|----------------|-------------|
+| **Menu**      | Escape         | Sends Escape key |
+| **Siri**      | Fn             | Sends Function key |
+| **Play/Pause**| Play/Pause     | System media play/pause |
+| **Volume +**  | Volume Up      | System volume up |
+| **Volume −**  | Volume Down    | System volume down |
+| **TV**        | None           | Unmapped by default |
+| **Select**    | Click          | Left mouse click (hold to drag) |
+| **Power**     | None           | Unmapped by default |
+
+### Touch Surface Gestures
+
+| Gesture | Action |
+|---------|--------|
+| **Single-finger swipe** | Move cursor |
+| **Single-finger tap**   | Left click |
+| **Two-finger swipe**    | Scroll |
+| **Press firmly**        | Left click / start drag (hold and swipe to drag) |
 
 ## Troubleshooting
 
-- **Not connecting**: Check Bluetooth, re-pair remote, restart app
-- **Cursor not moving**: Verify Accessibility permissions, check connection status, ensure Cursor Mode
-- **Buttons not working**: Check mappings in menu bar, verify connection
+| Issue | Solution |
+|-------|----------|
+| Remote shows "Disconnected" | Check Bluetooth pairing, press any remote button to wake it, then wait a few seconds |
+| Cursor does not move | Verify **Accessibility** permission is granted to Remotastic in System Settings |
+| Touch only moves horizontally/vertically | Quit Remotastic completely and reopen; ensure no other instance is running |
+| System beeps on button press | This means Remotastic does not have exclusive HID access; quit and reopen the app |
+| Buttons work but touch doesn't | Make sure your remote is fully paired (showing "Connected" in Bluetooth, not just "Paired") |
+| Conflict with Magic Trackpad | Use the **Pause** option in the menu bar to temporarily disable Remotastic |
 
-## Limitations
+## Technical Notes
 
-- Uses private APIs (not App Store compatible)
-- Remote may disconnect after ~90s inactivity (press any button to reconnect)
-- Requires Accessibility permissions
-- **Tested only with Apple TV Siri Remote model A1513** (other models may work but are untested)
+- **Touch handling** uses Apple's private `MultitouchSupport.framework` to read absolute coordinates from the Siri Remote touch surface
+- **Button handling** uses `IOKit.hid` with device seize to prevent macOS from processing remote button events independently
+- **Media keys** are intercepted via `CGEventTap` to avoid double-firing when both HID and system AVRCP paths are active
+- Not App Store compatible due to private API usage
 
 ## Contributing
 
@@ -57,4 +118,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License — see [LICENSE](LICENSE) for details.
