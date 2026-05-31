@@ -1,6 +1,8 @@
-# Remotastic
+# Siri Remote for macOS
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+> A fork of [Remotastic](https://github.com/laurentschuermans/Remotastic) by Laurent Schuermans. This project builds upon the original work with additional device support, UI improvements, and enhanced stability.
 
 Control your Mac with your Apple TV Siri Remote — a lightweight menu bar app that turns your Siri Remote into a trackpad and media controller.
 
@@ -47,7 +49,7 @@ Then double-click **Remotastic** in your Applications folder.
 
 ## Required Permissions
 
-Remotastic requires two system permissions to function:
+Siri Remote for macOS requires two system permissions to function:
 
 1. **Accessibility** (System Settings → Privacy & Security → Accessibility)
    - Required for: cursor movement, mouse clicks, and simulated keyboard shortcuts
@@ -61,11 +63,11 @@ The app will prompt you automatically when a permission is needed.
 1. On your Siri Remote, press and hold **Menu + Volume Up** for 5 seconds
 2. On your Mac, go to **System Settings → Bluetooth**
 3. Select your remote from the list and click **Connect**
-4. Open Remotastic — it will appear in the menu bar automatically
+4. Open Siri Remote for macOS — it will appear in the menu bar automatically
 
 ## Usage
 
-Click the **Remotastic** menu bar icon to:
+Click the **Siri Remote for macOS** menu bar icon to:
 
 - View Bluetooth connection status
 - Configure button mappings per app
@@ -99,11 +101,11 @@ Click the **Remotastic** menu bar icon to:
 | Issue | Solution |
 |-------|----------|
 | Remote shows "Disconnected" | Check Bluetooth pairing, press any remote button to wake it, then wait a few seconds |
-| Cursor does not move | Verify **Accessibility** permission is granted to Remotastic in System Settings |
-| Touch only moves horizontally/vertically | Quit Remotastic completely and reopen; ensure no other instance is running |
-| System beeps on button press | This means Remotastic does not have exclusive HID access; quit and reopen the app |
+| Cursor does not move | Verify **Accessibility** permission is granted to Siri Remote for macOS in System Settings |
+| Touch only moves horizontally/vertically | Quit Siri Remote for macOS completely and reopen; ensure no other instance is running |
+| System beeps on button press | This means Siri Remote for macOS does not have exclusive HID access; quit and reopen the app |
 | Buttons work but touch doesn't | Make sure your remote is fully paired (showing "Connected" in Bluetooth, not just "Paired") |
-| Conflict with Magic Trackpad | Use the **Pause** option in the menu bar to temporarily disable Remotastic |
+| Conflict with Magic Trackpad | Use the **Pause** option in the menu bar to temporarily disable Siri Remote for macOS |
 
 ## Technical Notes
 

@@ -1,6 +1,8 @@
-# Remotastic
+# Siri Remote for macOS
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+> 本项目基于 [Remotastic](https://github.com/laurentschuermans/Remotastic)（作者：Laurent Schuermans）进行二次开发与改进，增加了更多设备支持、界面优化和稳定性增强。
 
 用 Apple TV Siri Remote 控制你的 Mac——一款轻量级菜单栏应用，把你的 Siri Remote 变成触控板和媒体控制器。
 
@@ -43,11 +45,11 @@ cd Remotastic
 cp -R Remotastic.app /Applications/
 ```
 
-然后在「应用程序」文件夹中双击 **Remotastic**。
+然后在「应用程序」文件夹中双击 **Siri Remote for macOS**。
 
 ## 必需权限
 
-Remotastic 需要两项系统权限才能正常工作：
+Siri Remote for macOS 需要两项系统权限才能正常工作：
 
 1. **辅助功能**（系统设置 → 隐私与安全性 → 辅助功能）
    - 用途：光标移动、鼠标点击、模拟键盘快捷键
@@ -61,11 +63,11 @@ Remotastic 需要两项系统权限才能正常工作：
 1. 在 Siri Remote 上，按住 **Menu + 音量加** 键 5 秒钟
 2. 在 Mac 上，打开 **系统设置 → 蓝牙**
 3. 在列表中选择你的遥控器，点击 **连接**
-4. 打开 Remotastic——它会自动出现在菜单栏中
+4. 打开 Siri Remote for macOS——它会自动出现在菜单栏中
 
 ## 使用说明
 
-点击菜单栏中的 **Remotastic** 图标可以：
+点击菜单栏中的 **Siri Remote for macOS** 图标可以：
 
 - 查看蓝牙连接状态
 - 按应用配置按钮映射
@@ -99,11 +101,11 @@ Remotastic 需要两项系统权限才能正常工作：
 | 问题 | 解决方法 |
 |------|---------|
 | 遥控器显示「未连接」 | 检查蓝牙配对状态，按任意遥控器按钮唤醒，然后等待几秒 |
-| 光标不移动 | 在系统设置中确认已给 Remotastic 开启**辅助功能**权限 |
-| 触摸只能横平竖直移动 | 彻底退出 Remotastic 再重新打开；确保没有其他实例在后台运行 |
-| 按按钮时有系统提示音 | 说明 Remotastic 没有独占 HID 访问权；退出并重新打开应用 |
+| 光标不移动 | 在系统设置中确认已给 Siri Remote for macOS 开启**辅助功能**权限 |
+| 触摸只能横平竖直移动 | 彻底退出 Siri Remote for macOS 再重新打开；确保没有其他实例在后台运行 |
+| 按按钮时有系统提示音 | 说明 Siri Remote for macOS 没有独占 HID 访问权；退出并重新打开应用 |
 | 按钮可用但触摸无效 | 确保遥控器已完全配对（在蓝牙中显示「已连接」，而非仅「已配对」）|
-| 与妙控板冲突 | 使用菜单栏中的 **暂停** 选项临时禁用 Remotastic |
+| 与妙控板冲突 | 使用菜单栏中的 **暂停** 选项临时禁用 Siri Remote for macOS |
 
 ## 技术说明
 
