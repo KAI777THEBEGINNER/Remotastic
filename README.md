@@ -3,6 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > A fork of [Remotastic](https://github.com/laurentschuermans/Remotastic) by Laurent Schuermans. This project builds upon the original work with additional device support, UI improvements, and enhanced stability.
+>
+> [中文说明](README_CN.md)
 
 Control your Mac with your Apple TV Siri Remote — a lightweight menu bar app that turns your Siri Remote into a trackpad and media controller.
 
