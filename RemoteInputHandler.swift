@@ -32,6 +32,8 @@ class RemoteInputHandler {
     // Prevent double-processing with MediaKeyInterceptor
     static var lastProcessedButton: String?
     static var lastProcessedTime: UInt64 = 0
+    static var lastProcessedMediaKey: MediaKeyInterceptor.MediaKeyType?
+    static var lastProcessedMediaKeyTime: UInt64 = 0
 
     var isEnabled = true {
         didSet {
@@ -139,7 +141,13 @@ class RemoteInputHandler {
         let currentTime = mach_absolute_time()
         RemoteInputHandler.lastProcessedButton = buttonName
         RemoteInputHandler.lastProcessedTime = currentTime
-        
+
+        // Track media keys so MediaKeyInterceptor can distinguish remote from built-in keyboard
+        if let mediaKey = mediaKeyType(for: buttonName) {
+            RemoteInputHandler.lastProcessedMediaKey = mediaKey
+            RemoteInputHandler.lastProcessedMediaKeyTime = currentTime
+        }
+
         let action = menuBarManager?.getMapping(for: buttonName) ?? .none
         print("🔘 Button pressed: \(buttonName) → \(action.rawValue)")
         if action != .none {
@@ -271,8 +279,20 @@ class RemoteInputHandler {
         }
     }
     
+    private func mediaKeyType(for buttonName: String) -> MediaKeyInterceptor.MediaKeyType? {
+        switch buttonName {
+        case "playPause": return .playPause
+        case "nextTrack": return .next
+        case "prevTrack": return .previous
+        case "volumeUp": return .volumeUp
+        case "volumeDown": return .volumeDown
+        case "mute": return .mute
+        default: return nil
+        }
+    }
+
     // MARK: - Action Execution
-    
+
     private func executeAction(_ action: ButtonAction) {
         switch action {
         case .none:

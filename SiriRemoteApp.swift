@@ -169,11 +169,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if isPaused {
             touchHandler?.isEnabled = false
             remoteInputHandler?.isEnabled = false
+            mediaKeyInterceptor?.stop()
             menuBarManager.updatePauseStatus(paused: true)
             print("⏸️ Mapping paused")
         } else {
             touchHandler?.isEnabled = true
             remoteInputHandler?.isEnabled = true
+            mediaKeyInterceptor?.start()
             menuBarManager.updatePauseStatus(paused: false)
             print("▶️ Mapping resumed")
         }
@@ -197,50 +199,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func handleInterceptedMediaKey(_ keyType: MediaKeyInterceptor.MediaKeyType) -> Bool {
-        let buttonName: String
-        let defaultAction: String
-        
-        switch keyType {
-        case .playPause:
-            buttonName = "playPause"
-            defaultAction = "Play/Pause"
-        case .next:
-            buttonName = "nextTrack"
-            defaultAction = "Next Track"
-        case .previous:
-            buttonName = "prevTrack"
-            defaultAction = "Previous Track"
-        case .volumeUp:
-            buttonName = "volumeUp"
-            defaultAction = "Volume Up"
-        case .volumeDown:
-            buttonName = "volumeDown"
-            defaultAction = "Volume Down"
-        case .mute:
-            return false
-        }
-        
-        // Check if RemoteInputHandler just processed this button (prevent double-processing)
-        if RemoteInputHandler.lastProcessedButton == buttonName {
-            let timeSinceLastProcess = Self.machDeltaToSeconds(from: RemoteInputHandler.lastProcessedTime)
-            if timeSinceLastProcess < 0.2 { // Within 200ms debounce window
-                // RemoteInputHandler already handled this, consume the event but don't process again
+        // Only consume media key events that were recently triggered by the Siri Remote HID path.
+        // If the event is from the built-in keyboard (not tracked by RemoteInputHandler), let macOS handle it.
+        if RemoteInputHandler.lastProcessedMediaKey == keyType {
+            let timeSinceLastProcess = Self.machDeltaToSeconds(from: RemoteInputHandler.lastProcessedMediaKeyTime)
+            if timeSinceLastProcess < 0.15 { // Within 150ms debounce window
+                // RemoteInputHandler already handled this via HID. Consume the duplicate system event.
                 return true
             }
         }
-        
-        let action = menuBarManager.getMapping(for: buttonName)
-        
-        if action == .none {
-            return true // Consume but do nothing
-        }
-        
-        if action.rawValue == defaultAction {
-            return true // HID path is the single source for all media keys; consume system events
-        }
-        
-        menuBarManager.executeAction(action.rawValue)
-        return true
+        return false // Let the system (built-in keyboard) handle it normally
     }
     
     // MARK: - Permissions
